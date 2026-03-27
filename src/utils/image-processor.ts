@@ -83,10 +83,15 @@ export async function processImage(
 export function deleteImage(imageUrl: string): void {
   if (!imageUrl || !imageUrl.startsWith('/uploads/')) return;
 
-  const filePath = path.join(UPLOAD_DIR, '..', 'uploads', imageUrl.replace('/uploads/', ''));
+  // Resolve the absolute path and verify it stays within UPLOAD_DIR (path traversal prevention)
+  const resolvedPath = path.resolve(UPLOAD_DIR, imageUrl.replace('/uploads/', ''));
+  if (!resolvedPath.startsWith(UPLOAD_DIR + path.sep) && resolvedPath !== UPLOAD_DIR) {
+    logger.warn(`Tentative de traversée de répertoire bloquée: ${imageUrl}`);
+    return;
+  }
 
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
+  if (fs.existsSync(resolvedPath)) {
+    fs.unlinkSync(resolvedPath);
     logger.info(`Image supprimée: ${imageUrl}`);
   }
 }
