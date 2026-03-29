@@ -11,6 +11,10 @@ import { logger } from './logger';
 
 const UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads');
 
+// Identité de cette instance média (injectée via variables d'environnement)
+const SERVICE_ID = process.env.SERVICE_ID || 'media-default';
+const SERVICE_LOCATION = (process.env.SERVICE_LOCATION || 'EU').toUpperCase();
+
 // Tailles d'images par type
 const IMAGE_SIZES = {
   avatar: { width: 256, height: 256, fit: 'cover' as const },
@@ -63,7 +67,9 @@ export async function processImage(
 
   const info = await processed.toFile(outputPath);
 
-  const url = `/uploads/${folder}/${filename}`;
+  // Nouvelle URL : /api/media/:location/:serviceId/:folder/:filename
+  // Le gateway utilise ces segments pour router vers la bonne instance.
+  const url = `/api/media/${SERVICE_LOCATION}/${SERVICE_ID}/${folder}/${filename}`;
 
   logger.info(`Image traitée: ${type} → ${filename} (${info.width}x${info.height}, ${info.size} octets)`);
 
