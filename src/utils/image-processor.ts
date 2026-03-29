@@ -84,13 +84,28 @@ export async function processImage(
 }
 
 /**
- * Supprime une ancienne image du disque
+ * Supprime une ancienne image du disque.
+ * Supporte deux formats d'URL :
+ *  - Ancien : /uploads/:folder/:filename
+ *  - Nouveau : /api/media/:location/:serviceId/:folder/:filename
  */
 export function deleteImage(imageUrl: string): void {
-  if (!imageUrl || !imageUrl.startsWith('/uploads/')) return;
+  if (!imageUrl) return;
 
-  // Resolve the absolute path and verify it stays within UPLOAD_DIR (path traversal prevention)
-  const resolvedPath = path.resolve(UPLOAD_DIR, imageUrl.replace('/uploads/', ''));
+  let relativePath: string | null = null;
+
+  if (imageUrl.startsWith('/uploads/')) {
+    relativePath = imageUrl.replace('/uploads/', '');
+  } else {
+    // /api/media/:location/:serviceId/:folder/:filename → on garde :folder/:filename
+    const match = imageUrl.match(/^\/api\/media\/[^/]+\/[^/]+\/(.+)$/);
+    if (match) relativePath = match[1];
+  }
+
+  if (!relativePath) return;
+
+  // Sécurité : vérifier que le chemin résolu reste dans UPLOAD_DIR
+  const resolvedPath = path.resolve(UPLOAD_DIR, relativePath);
   if (!resolvedPath.startsWith(UPLOAD_DIR + path.sep) && resolvedPath !== UPLOAD_DIR) {
     logger.warn(`Tentative de traversée de répertoire bloquée: ${imageUrl}`);
     return;
