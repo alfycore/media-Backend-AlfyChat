@@ -5,6 +5,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import os from 'os';
+import v8 from 'v8';
 
 // Compteur de requêtes avec fenêtre glissante de 20 minutes
 const WINDOW_MS = 20 * 60 * 1000; // 20 minutes
@@ -57,8 +58,8 @@ export function collectMetrics(): {
 
   // RAM
   const memUsage = process.memoryUsage();
-  const ramUsage = memUsage.rss;
-  const totalMem = os.totalmem();
+  const ramUsage = memUsage.heapUsed;
+  const totalMem = v8.getHeapStatistics().heap_size_limit;
 
   // CPU — moyenne sur tous les cœurs depuis le démarrage
   const cpus = os.cpus();
