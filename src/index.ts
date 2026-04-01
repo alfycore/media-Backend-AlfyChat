@@ -47,9 +47,15 @@ app.use('/uploads', express.static(UPLOAD_DIR, {
   maxAge: '7d',
   etag: true,
   lastModified: true,
-  setHeaders: (res) => {
+  setHeaders: (res, filePath) => {
     res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
     res.setHeader('Access-Control-Allow-Origin', '*');
+    // Documents non-image : forcer le téléchargement
+    const ext = filePath.split('.').pop()?.toLowerCase() || '';
+    const docExts = ['pdf','doc','docx','xls','xlsx','ppt','pptx','txt','csv'];
+    if (docExts.includes(ext)) {
+      res.setHeader('Content-Disposition', `attachment; filename="${filePath.split('/').pop()}"`);
+    }
   },
 }));
 

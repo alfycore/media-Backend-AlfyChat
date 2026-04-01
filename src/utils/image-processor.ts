@@ -124,3 +124,58 @@ export function isValidImageType(mimetype: string): boolean {
   const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
   return allowed.includes(mimetype);
 }
+
+/** Types MIME acceptés pour les pièces jointes documentaires */
+export const DOCUMENT_MIMES: Record<string, string> = {
+  'application/pdf': 'pdf',
+  'application/msword': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.ms-excel': 'xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'application/vnd.ms-powerpoint': 'ppt',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+  'text/plain': 'txt',
+  'text/csv': 'csv',
+};
+
+export function isValidDocumentType(mimetype: string): boolean {
+  return mimetype in DOCUMENT_MIMES || isValidImageType(mimetype);
+}
+
+export interface SavedDocument {
+  filename: string;
+  url: string;
+  size: number;
+  mimeType: string;
+  originalName: string;
+}
+
+/**
+ * Sauvegarde un document (non-image) directement sur disque sans traitement.
+ */
+export async function saveDocument(
+  buffer: Buffer,
+  originalName: string,
+  mimetype: string,
+  userId: string,
+): Promise<SavedDocument> {
+  const folder = 'attachments';
+  const ext = DOCUMENT_MIMES[mimetype] || path.extname(originalName).replace('.', '') || 'bin';
+  const safeName = originalName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
+  const filename = `${userId}-${uuidv4().slice(0, 8)}-${safeName}`;
+  const outputPath = path.join(UPLOAD_DIR, folder, filename);
+
+  // Security: ensure output path stays within UPLOAD_DIR
+  const resolved = path.resolve(outputPath);
+  if (!resolved.startsWith(path.resolve(UPLOAD_DIR) + path.sep)) {
+    throw new Error('Chemin de fichier invalide');
+  }
+
+  fs.writeFileSync(outputPath, buffer);
+
+  const url = `/api/media/${SERVICE_LOCATION}/${SERVICE_ID}/${folder}/${encodeURIComponent(filename)}`;
+
+  logger.info(`Document sauvegardé: ${filename} (${buffer.length} octets) pour ${userId}`);
+
+  return { filename, url, size: buffer.length, mimeType: mimetype, originalName: safeName };
+}

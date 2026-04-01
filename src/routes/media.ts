@@ -10,6 +10,8 @@ import {
   processImage,
   deleteImage,
   isValidImageType,
+  isValidDocumentType,
+  saveDocument,
   MAX_FILE_SIZE,
   ImageType,
 } from '../utils/image-processor';
@@ -118,6 +120,50 @@ mediaRouter.post(
     } catch (error) {
       logger.error('Erreur upload pièce jointe:', error);
       res.status(500).json({ error: 'Erreur lors du traitement de l\'image' });
+    }
+  }
+);
+
+// ============ UPLOAD DE DOCUMENT (pdf, docx, xlsx…) ============
+const uploadDoc = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_FILE_SIZE, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (isValidDocumentType(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Type de fichier non supporté. Utilisez PDF, DOCX, XLSX, PNG, JPG, etc.'));
+    }
+  },
+});
+
+mediaRouter.post(
+  '/upload/document',
+  authMiddleware,
+  uploadDoc.single('file'),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      if (!req.file) {
+        res.status(400).json({ error: 'Aucun fichier fourni' });
+        return;
+      }
+
+      const { mimetype, originalname, buffer } = req.file;
+
+      // Images → traiter avec sharp pour optimisation
+      if (isValidImageType(mimetype)) {
+        const result = await processImage(buffer, 'attachment', req.userId!);
+        res.json({ success: true, url: result.url, filename: originalname, size: result.size, mimeType: result.mimeType, isImage: true });
+        return;
+      }
+
+      // Documents → sauvegarder brut
+      const result = await saveDocument(buffer, originalname, mimetype, req.userId!);
+      logger.info(`Document uploadé pour ${req.userId}: ${result.url}`);
+      res.json({ success: true, url: result.url, filename: result.originalName, size: result.size, mimeType: result.mimeType, isImage: false });
+    } catch (error) {
+      logger.error('Erreur upload document:', error);
+      res.status(500).json({ error: 'Erreur lors de l\'enregistrement du fichier' });
     }
   }
 );
