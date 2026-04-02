@@ -136,10 +136,25 @@ export const DOCUMENT_MIMES: Record<string, string> = {
   'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
   'text/plain': 'txt',
   'text/csv': 'csv',
+  // Variantes courantes sur Windows
+  'application/zip': 'docx',
+  'application/x-zip-compressed': 'docx',
+  'application/octet-stream': 'bin',
+  'application/x-pdf': 'pdf',
 };
 
-export function isValidDocumentType(mimetype: string): boolean {
-  return mimetype in DOCUMENT_MIMES || isValidImageType(mimetype);
+/** Extensions de fichiers documentaires autorisées (fallback si MIME générique) */
+const DOCUMENT_EXTS = new Set(['pdf','doc','docx','xls','xlsx','ppt','pptx','txt','csv']);
+
+export function isValidDocumentType(mimetype: string, originalName?: string): boolean {
+  if (isValidImageType(mimetype)) return true;
+  if (mimetype in DOCUMENT_MIMES) return true;
+  // Fallback : vérifier par extension si MIME générique
+  if (originalName) {
+    const ext = originalName.split('.').pop()?.toLowerCase() || '';
+    if (DOCUMENT_EXTS.has(ext)) return true;
+  }
+  return false;
 }
 
 export interface SavedDocument {
@@ -173,9 +188,13 @@ export async function saveDocument(
 
   fs.writeFileSync(outputPath, buffer);
 
+  // Déterminer l'extension réelle depuis le nom de fichier (fallback sur MIME)
+  const realExt = path.extname(safeName).replace('.', '').toLowerCase() ||
+    DOCUMENT_MIMES[mimetype] ||
+    'bin';
   const url = `/api/media/${SERVICE_LOCATION}/${SERVICE_ID}/${folder}/${encodeURIComponent(filename)}`;
 
-  logger.info(`Document sauvegardé: ${filename} (${buffer.length} octets) pour ${userId}`);
+  logger.info(`Document sauvegardé: ${filename} (${buffer.length} octets, .${realExt}) pour ${userId}`);
 
   return { filename, url, size: buffer.length, mimeType: mimetype, originalName: safeName };
 }

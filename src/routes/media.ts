@@ -129,7 +129,7 @@ const uploadDoc = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_SIZE, files: 1 },
   fileFilter: (req, file, cb) => {
-    if (isValidDocumentType(file.mimetype)) {
+    if (isValidDocumentType(file.mimetype, file.originalname)) {
       cb(null, true);
     } else {
       cb(new Error('Type de fichier non supporté. Utilisez PDF, DOCX, XLSX, PNG, JPG, etc.'));
