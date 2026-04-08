@@ -210,8 +210,10 @@ mediaRouter.delete(
         return;
       }
 
-      // Vérifier que l'URL contient l'userId (sécurité: on ne peut supprimer que ses propres images)
-      if (!url.includes(req.userId!)) {
+      // Vérifier que le fichier appartient bien à l'utilisateur.
+      // Les fichiers sont nommés `{userId}-{uuid}.webp` — on vérifie le préfixe du nom de fichier.
+      const filename = url.split('/').pop() || '';
+      if (!filename.startsWith(req.userId! + '-')) {
         res.status(403).json({ error: 'Vous ne pouvez supprimer que vos propres images' });
         return;
       }
