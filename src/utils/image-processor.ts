@@ -21,12 +21,13 @@ const IMAGE_SIZES = {
   banner: { width: 960, height: 320, fit: 'cover' as const },
   attachment: { width: 1920, height: 1080, fit: 'inside' as const },
   icon: { width: 128, height: 128, fit: 'cover' as const },
+  wallpaper: { width: 1920, height: 1080, fit: 'inside' as const },
 };
 
 // Taille max d'upload (10 Mo)
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-export type ImageType = 'avatar' | 'banner' | 'attachment' | 'icon';
+export type ImageType = 'avatar' | 'banner' | 'attachment' | 'icon' | 'wallpaper';
 
 export interface ProcessedImage {
   filename: string;
@@ -52,6 +53,7 @@ export async function processImage(
   const folder = type === 'avatar' ? 'avatars'
     : type === 'banner' ? 'banners'
     : type === 'icon' ? 'icons'
+    : type === 'wallpaper' ? 'wallpapers'
     : 'attachments';
 
   const filename = `${userId}-${uuidv4().slice(0, 8)}.webp`;

@@ -93,6 +93,35 @@ mediaRouter.post(
   }
 );
 
+// ============ UPLOAD DE WALLPAPER ============
+mediaRouter.post(
+  '/upload/wallpaper',
+  authMiddleware,
+  upload.single('file'),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      if (!req.file) {
+        res.status(400).json({ error: 'Aucun fichier fourni' });
+        return;
+      }
+
+      const result = await processImage(req.file.buffer, 'wallpaper', req.userId!);
+
+      logger.info(`Wallpaper uploadé pour ${req.userId}: ${result.url}`);
+      res.json({
+        success: true,
+        url: result.url,
+        width: result.width,
+        height: result.height,
+        size: result.size,
+      });
+    } catch (error) {
+      logger.error('Erreur upload wallpaper:', error);
+      res.status(500).json({ error: 'Erreur lors du traitement de l\'image' });
+    }
+  }
+);
+
 // ============ UPLOAD DE PIÈCE JOINTE (message) ============
 mediaRouter.post(
   '/upload/attachment',
