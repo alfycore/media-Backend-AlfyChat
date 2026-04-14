@@ -49,7 +49,7 @@ app.use('/uploads', express.static(UPLOAD_DIR, {
   lastModified: true,
   setHeaders: (res, filePath) => {
     res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || process.env.GATEWAY_URL || 'http://localhost:4000');
     // Documents non-image : forcer le téléchargement
     const ext = filePath.split('.').pop()?.toLowerCase() || '';
     const docExts = ['pdf','doc','docx','xls','xlsx','ppt','pptx','txt','csv'];
