@@ -43,21 +43,31 @@ app.use(helmet({
 }));
 
 // Servir les fichiers statiques (images uploadées)
+// Hardening : dotfiles refusés, pas de listing de dossier, nosniff, extensions inconnues 404.
 app.use('/uploads', express.static(UPLOAD_DIR, {
   maxAge: '7d',
   etag: true,
   lastModified: true,
+  dotfiles: 'deny',
+  index: false,
+  redirect: false,
   setHeaders: (res, filePath) => {
     res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || process.env.GATEWAY_URL || 'http://localhost:4000');
-    // Documents non-image : forcer le téléchargement
+    // Documents non-image : forcer le téléchargement (évite l'exécution inline)
     const ext = filePath.split('.').pop()?.toLowerCase() || '';
     const docExts = ['pdf','doc','docx','xls','xlsx','ppt','pptx','txt','csv'];
     if (docExts.includes(ext)) {
-      res.setHeader('Content-Disposition', `attachment; filename="${filePath.split('/').pop()}"`);
+      const safeName = (filePath.split(/[\\/]/).pop() || 'file').replace(/"/g, '');
+      res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
     }
   },
 }));
+
+// Bloquer toute tentative d'accès au dossier racine /uploads (pas de listing).
+app.get('/uploads', (_req, res) => res.status(404).end());
+app.get('/uploads/', (_req, res) => res.status(404).end());
 
 // Routes API
 app.use('/media', mediaRouter);

@@ -234,15 +234,29 @@ mediaRouter.delete(
     try {
       const { url } = req.body as { url?: string };
 
-      if (!url) {
+      if (!url || typeof url !== 'string') {
         res.status(400).json({ error: 'URL de l\'image requise' });
         return;
       }
 
-      // Vérifier que le fichier appartient bien à l'utilisateur.
-      // Les fichiers sont nommés `{userId}-{uuid}.webp` — on vérifie le préfixe du nom de fichier.
-      const filename = url.split('/').pop() || '';
-      if (!filename.startsWith(req.userId! + '-')) {
+      if (!req.userId || typeof req.userId !== 'string') {
+        res.status(401).json({ error: 'Non authentifié' });
+        return;
+      }
+
+      // Validation stricte du format URL : /uploads/{folder}/{filename} ou /api/media/.../{filename}
+      // Les fichiers personnels sont nommés `{userId}-{uuid}.{ext}` — strict regex.
+      const urlMatch = url.match(/^\/(?:uploads|api\/media)\/[a-zA-Z0-9_\-/]+\/([^/]+)$/);
+      if (!urlMatch) {
+        res.status(400).json({ error: 'URL invalide' });
+        return;
+      }
+      const filename = urlMatch[1];
+
+      // Format autorisé : {userId}-{uuid}.{ext} où userId matche exactement req.userId
+      // (UUID v4 : 36 chars hex+tirets, extension 3-5 chars alphanumériques)
+      const fileOwnerMatch = filename.match(/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-[0-9a-f-]+\.[a-z0-9]{3,5}$/i);
+      if (!fileOwnerMatch || fileOwnerMatch[1].toLowerCase() !== req.userId.toLowerCase()) {
         res.status(403).json({ error: 'Vous ne pouvez supprimer que vos propres images' });
         return;
       }
