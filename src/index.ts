@@ -20,7 +20,7 @@ const app = express();
 
 // Créer les dossiers d'upload
 const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
-const UPLOAD_DIRS = ['avatars', 'banners', 'attachments', 'icons'];
+const UPLOAD_DIRS = ['avatars', 'banners', 'attachments', 'icons', 'wallpapers'];
 
 for (const dir of UPLOAD_DIRS) {
   const dirPath = path.join(UPLOAD_DIR, dir);
