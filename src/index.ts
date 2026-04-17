@@ -100,8 +100,8 @@ const PORT = parseInt(process.env.PORT || '3007');
 async function registerWithGateway(): Promise<void> {
   try {
     const metrics = collectMetrics();
-    const endpoint = process.env.SERVICE_ENDPOINT || `http://localhost:${PORT}`;
-    const domain = process.env.SERVICE_DOMAIN || `localhost:${PORT}`;
+    const endpoint = process.env.SERVICE_ENDPOINT || `http://media:${PORT}`;
+    const domain = process.env.SERVICE_DOMAIN || 'media';
 
     const res = await fetch(`${GATEWAY_URL}/api/internal/service/register`, {
       method: 'POST',
