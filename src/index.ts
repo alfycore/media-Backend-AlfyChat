@@ -88,84 +88,13 @@ app.get('/metrics', (req, res) => {
   });
 });
 
-// ============ ENREGISTREMENT & HEARTBEAT GATEWAY ============
-
-const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:3000';
-const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'alfychat-internal-secret-dev';
 const SERVICE_ID = process.env.SERVICE_ID || 'media-default';
 const SERVICE_LOCATION = (process.env.SERVICE_LOCATION || 'EU').toUpperCase();
 const PORT = parseInt(process.env.PORT || '3007');
 
-/** Enregistre cette instance auprès du gateway */
-async function registerWithGateway(): Promise<void> {
-  try {
-    const metrics = collectMetrics();
-    const endpoint = process.env.SERVICE_ENDPOINT || `http://media:${PORT}`;
-    const domain = process.env.SERVICE_DOMAIN || 'media';
-
-    const res = await fetch(`${GATEWAY_URL}/api/internal/service/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        secret: INTERNAL_SECRET,
-        id: SERVICE_ID,
-        serviceType: 'media',
-        endpoint,
-        domain,
-        location: SERVICE_LOCATION,
-        metrics,
-      }),
-    });
-
-    if (res.ok) {
-      logger.info(`Service média enregistré auprès du gateway (${SERVICE_ID} @ ${endpoint})`);
-    } else {
-      logger.warn(`Échec de l'enregistrement gateway: ${res.status}`);
-    }
-  } catch (err) {
-    logger.warn('Gateway non disponible pour l\'enregistrement, nouvelle tentative dans 30s…');
-  }
-}
-
-/** Envoie les métriques au gateway (heartbeat) */
-async function sendHeartbeat(): Promise<void> {
-  try {
-    const metrics = collectMetrics();
-    const res = await fetch(`${GATEWAY_URL}/api/internal/service/heartbeat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret: INTERNAL_SECRET, id: SERVICE_ID, metrics }),
-    });
-
-    // Si le gateway répond 404, c'est qu'il a redémarré → se ré-enregistrer
-    if (res.status === 404) {
-      logger.warn('Instance inconnue du gateway, ré-enregistrement…');
-      await registerWithGateway();
-    }
-  } catch {
-    // Erreur réseau → pas bloquant
-  }
-}
-
 // Démarrage
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
   logger.info(`🖼️  Service Média démarré sur le port ${PORT}`);
   logger.info(`   ID: ${SERVICE_ID} | Région: ${SERVICE_LOCATION}`);
   logger.info(`   Dossier uploads: ${UPLOAD_DIR}`);
-
-  // Premier enregistrement avec retry si le gateway n'est pas encore prêt
-  let attempts = 0;
-  const tryRegister = async () => {
-    await registerWithGateway();
-    attempts++;
-    // Retry jusqu'à 5 fois avec intervalle progressif
-    if (attempts < 5) {
-      setTimeout(tryRegister, attempts * 10_000);
-    }
-  };
-  // Légère attente pour laisser le gateway démarrer
-  setTimeout(tryRegister, 3_000);
-
-  // Heartbeat toutes les 30 secondes
-  setInterval(sendHeartbeat, 30_000);
 });
