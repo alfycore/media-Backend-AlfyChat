@@ -27,6 +27,39 @@ const IMAGE_SIZES = {
 // Taille max d'upload (10 Mo)
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
+// Limite de pixels pour éviter les image-bombs (décompression mémoire)
+const MAX_INPUT_PIXELS = 100_000_000; // 100MP max → ~400MB RAM max
+sharp.cache(false); // Disable caching to prevent memory accumulation
+
+/**
+ * Valide les magic bytes du fichier pour vérifier le vrai type MIME.
+ * Refuse SVG, ICO, et tout fichier dont le contenu ne correspond pas aux magic bytes.
+ */
+export function validateMagicBytes(buffer: Buffer): string | null {
+  if (buffer.length < 12) return null;
+
+  // JPEG: FF D8 FF
+  if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) return 'image/jpeg';
+  // PNG: 89 50 4E 47
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) return 'image/png';
+  // GIF: 47 49 46 38
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) return 'image/gif';
+  // WebP: RIFF....WEBP
+  if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+      buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) return 'image/webp';
+  // AVIF: ....ftypavif or ....ftypavis
+  if (buffer.length >= 12 && buffer[4] === 0x66 && buffer[5] === 0x74 && buffer[6] === 0x79 && buffer[7] === 0x70) {
+    const brand = buffer.toString('ascii', 8, 12);
+    if (brand === 'avif' || brand === 'avis') return 'image/avif';
+  }
+
+  // SVG/HTML/XML — explicitly reject (XSS risk)
+  const head = buffer.toString('utf8', 0, Math.min(512, buffer.length)).toLowerCase();
+  if (head.includes('<svg') || head.includes('<!doctype') || head.includes('<html')) return null;
+
+  return null;
+}
+
 export type ImageType = 'avatar' | 'banner' | 'attachment' | 'icon' | 'wallpaper';
 
 export interface ProcessedImage {
@@ -56,11 +89,11 @@ export async function processImage(
     : type === 'wallpaper' ? 'wallpapers'
     : 'attachments';
 
-  const filename = `${userId}-${uuidv4().slice(0, 8)}.webp`;
+  const filename = `${userId}-${uuidv4()}.webp`;
   const outputPath = path.join(UPLOAD_DIR, folder, filename);
 
-  // Traitement avec sharp
-  const processed = sharp(buffer)
+  // Traitement avec sharp — limiter les pixels en entrée pour prévenir les image-bombs
+  const processed = sharp(buffer, { limitInputPixels: MAX_INPUT_PIXELS })
     .resize(config.width, config.height, {
       fit: config.fit,
       withoutEnlargement: true,

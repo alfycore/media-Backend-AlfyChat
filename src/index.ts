@@ -55,13 +55,9 @@ app.use('/uploads', express.static(UPLOAD_DIR, {
     res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || process.env.GATEWAY_URL || 'http://localhost:4000');
-    // Documents non-image : forcer le téléchargement (évite l'exécution inline)
-    const ext = filePath.split('.').pop()?.toLowerCase() || '';
-    const docExts = ['pdf','doc','docx','xls','xlsx','ppt','pptx','txt','csv'];
-    if (docExts.includes(ext)) {
-      const safeName = (filePath.split(/[\\/]/).pop() || 'file').replace(/"/g, '');
-      res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
-    }
+    // Forcer le téléchargement pour TOUS les fichiers (évite XSS inline)
+    const safeName = (filePath.split(/[\\/]/).pop() || 'file').replace(/"/g, '');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
   },
 }));
 

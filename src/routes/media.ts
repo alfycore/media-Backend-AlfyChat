@@ -12,6 +12,7 @@ import {
   isValidImageType,
   isValidDocumentType,
   saveDocument,
+  validateMagicBytes,
   MAX_FILE_SIZE,
   ImageType,
 } from '../utils/image-processor';
@@ -47,6 +48,13 @@ mediaRouter.post(
         return;
       }
 
+      // Valider les magic bytes pour éviter les fichiers déguisés (SVG/HTML → XSS)
+      const realMime = validateMagicBytes(req.file.buffer);
+      if (!realMime) {
+        res.status(400).json({ error: 'Type de fichier invalide — magic bytes non reconnus' });
+        return;
+      }
+
       const result = await processImage(req.file.buffer, 'avatar', req.userId!);
 
       logger.info(`Avatar uploadé pour ${req.userId}: ${result.url}`);
@@ -73,6 +81,12 @@ mediaRouter.post(
     try {
       if (!req.file) {
         res.status(400).json({ error: 'Aucun fichier fourni' });
+        return;
+      }
+
+      const realMime = validateMagicBytes(req.file.buffer);
+      if (!realMime) {
+        res.status(400).json({ error: 'Type de fichier invalide — magic bytes non reconnus' });
         return;
       }
 
@@ -105,6 +119,12 @@ mediaRouter.post(
         return;
       }
 
+      const realMime = validateMagicBytes(req.file.buffer);
+      if (!realMime) {
+        res.status(400).json({ error: 'Type de fichier invalide — magic bytes non reconnus' });
+        return;
+      }
+
       const result = await processImage(req.file.buffer, 'wallpaper', req.userId!);
 
       logger.info(`Wallpaper uploadé pour ${req.userId}: ${result.url}`);
@@ -131,6 +151,12 @@ mediaRouter.post(
     try {
       if (!req.file) {
         res.status(400).json({ error: 'Aucun fichier fourni' });
+        return;
+      }
+
+      const realMime = validateMagicBytes(req.file.buffer);
+      if (!realMime) {
+        res.status(400).json({ error: 'Type de fichier invalide — magic bytes non reconnus' });
         return;
       }
 
@@ -179,8 +205,13 @@ mediaRouter.post(
 
       const { mimetype, originalname, buffer } = req.file;
 
-      // Images → traiter avec sharp pour optimisation
+      // Images → valider magic bytes puis traiter avec sharp
       if (isValidImageType(mimetype)) {
+        const realMime = validateMagicBytes(buffer);
+        if (!realMime) {
+          res.status(400).json({ error: 'Type de fichier invalide — magic bytes non reconnus' });
+          return;
+        }
         const result = await processImage(buffer, 'attachment', req.userId!);
         res.json({ success: true, url: result.url, filename: originalname, size: result.size, mimeType: result.mimeType, isImage: true });
         return;
@@ -206,6 +237,12 @@ mediaRouter.post(
     try {
       if (!req.file) {
         res.status(400).json({ error: 'Aucun fichier fourni' });
+        return;
+      }
+
+      const realMime = validateMagicBytes(req.file.buffer);
+      if (!realMime) {
+        res.status(400).json({ error: 'Type de fichier invalide — magic bytes non reconnus' });
         return;
       }
 
@@ -246,7 +283,7 @@ mediaRouter.delete(
 
       // Validation stricte du format URL : /uploads/{folder}/{filename} ou /api/media/.../{filename}
       // Les fichiers personnels sont nommés `{userId}-{uuid}.{ext}` — strict regex.
-      const urlMatch = url.match(/^\/(?:uploads|api\/media)\/[a-zA-Z0-9_\-/]+\/([^/]+)$/);
+      const urlMatch = url.match(/^\/(?:uploads|api\/media)\/(?:[a-zA-Z0-9_\-]+\/){1,4}([^/]+)$/);
       if (!urlMatch) {
         res.status(400).json({ error: 'URL invalide' });
         return;
@@ -255,7 +292,7 @@ mediaRouter.delete(
 
       // Format autorisé : {userId}-{uuid}.{ext} où userId matche exactement req.userId
       // (UUID v4 : 36 chars hex+tirets, extension 3-5 chars alphanumériques)
-      const fileOwnerMatch = filename.match(/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-[0-9a-f-]+\.[a-z0-9]{3,5}$/i);
+      const fileOwnerMatch = filename.match(/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z0-9]{3,5}$/i);
       if (!fileOwnerMatch || fileOwnerMatch[1].toLowerCase() !== req.userId.toLowerCase()) {
         res.status(403).json({ error: 'Vous ne pouvez supprimer que vos propres images' });
         return;
