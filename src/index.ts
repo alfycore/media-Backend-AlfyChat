@@ -3,10 +3,13 @@
 // Upload, redimensionnement et stockage d'images
 // ==========================================
 
+import dotenv from 'dotenv';
+dotenv.config();
+import { registerGlobalErrorHandlers } from './utils/error-reporter';
+registerGlobalErrorHandlers();
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
