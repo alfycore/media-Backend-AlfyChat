@@ -87,6 +87,23 @@ app.get('/metrics', (req, res) => {
   });
 });
 
+// -- HTML error pages (browser content-negotiation) --------------------------
+app.get('/', (req, res, next) => {
+  if (req.accepts(['html', 'json']) === 'html')
+    return res.sendFile(path.join(__dirname, '../public/index.html'));
+  next();
+});
+app.use((req, res) => {
+  if (req.accepts(['html', 'json']) === 'html')
+    return res.status(404).sendFile(path.join(__dirname, '../public/errors/404.html'));
+  res.status(404).json({ error: 'Route not found', path: req.path });
+});
+app.use((err: any, req: any, res: any, _next: any) => {
+  if (req.accepts(['html', 'json']) === 'html')
+    return res.status(500).sendFile(path.join(__dirname, '../public/errors/500.html'));
+  res.status(500).json({ error: 'Internal server error' });
+});
+
 const SERVICE_ID = process.env.SERVICE_ID || 'media-default';
 const SERVICE_LOCATION = (process.env.SERVICE_LOCATION || 'EU').toUpperCase();
 const PORT = parseInt(process.env.PORT || '3007');
