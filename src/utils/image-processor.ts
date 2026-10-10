@@ -210,8 +210,19 @@ export async function saveDocument(
   userId: string,
 ): Promise<SavedDocument> {
   const folder = 'attachments';
-  const ext = DOCUMENT_MIMES[mimetype] || path.extname(originalName).replace('.', '') || 'bin';
-  const safeName = originalName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
+  // Extension issue d'une LISTE BLANCHE uniquement. Le nom d'origine était
+  // conservé tel quel : un « document » `.html` / `.js` / `.svg` envoyé en
+  // `application/octet-stream` était ensuite re-servi par le gateway avec un
+  // Content-Type exécutable, depuis le domaine de l'API.
+  const declaredExt = path.extname(originalName).replace('.', '').toLowerCase();
+  const ext = DOCUMENT_EXTS.has(declaredExt)
+    ? declaredExt
+    : (DOCUMENT_MIMES[mimetype] && DOCUMENT_MIMES[mimetype] !== 'bin' ? DOCUMENT_MIMES[mimetype] : 'bin');
+  const baseName = path.basename(originalName, path.extname(originalName))
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .slice(0, 60) || 'fichier';
+  const safeName = `${baseName}.${ext}`;
   const filename = `${userId}-${uuidv4().slice(0, 8)}-${safeName}`;
   const outputPath = path.join(UPLOAD_DIR, folder, filename);
 
@@ -223,10 +234,7 @@ export async function saveDocument(
 
   fs.writeFileSync(outputPath, buffer);
 
-  // Déterminer l'extension réelle depuis le nom de fichier (fallback sur MIME)
-  const realExt = path.extname(safeName).replace('.', '').toLowerCase() ||
-    DOCUMENT_MIMES[mimetype] ||
-    'bin';
+  const realExt = ext;
   const url = `/api/media/${SERVICE_LOCATION}/${SERVICE_ID}/${folder}/${encodeURIComponent(filename)}`;
 
   logger.info(`Document sauvegardé: ${filename} (${buffer.length} octets, .${realExt}) pour ${userId}`);
