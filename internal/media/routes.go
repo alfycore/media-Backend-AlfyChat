@@ -6,6 +6,7 @@
 package media
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -180,20 +181,40 @@ func (h *handlers) serveUploads(w http.ResponseWriter, r *http.Request) bool {
 	if strings.HasSuffix(decoded, "/") {
 		return true
 	}
-	full := filepath.Join(uploadDir(), filepath.FromSlash(strings.Trim(decoded, "/")))
-	fi, err := os.Stat(full)
-	if err != nil || fi.IsDir() {
-		return true
+	var (
+		content io.ReadSeeker
+		size    int64
+		modTime time.Time
+		name    string
+	)
+	// Les images sont d'abord cherchées en base (/uploads/<dossier>/<fichier>), puis sur disque.
+	if len(segs) == 2 {
+		data, mt, ok, err := loadImage(r.Context(), segs[0], segs[1])
+		if err != nil {
+			slog.Error("Lecture image en base", "err", err)
+			return fall()
+		}
+		if ok {
+			content, size, modTime, name = bytes.NewReader(data), int64(len(data)), mt, segs[1]
+		}
 	}
-	f, err := os.Open(full)
-	if err != nil {
-		return fall()
+	if content == nil {
+		full := filepath.Join(uploadDir(), filepath.FromSlash(strings.Trim(decoded, "/")))
+		fi, err := os.Stat(full)
+		if err != nil || fi.IsDir() {
+			return true
+		}
+		f, err := os.Open(full)
+		if err != nil {
+			return fall()
+		}
+		defer f.Close()
+		content, name = f, fi.Name()
+		size, modTime = fi.Size(), fi.ModTime()
 	}
-	defer f.Close()
 
 	hd := w.Header()
-	name := fi.Name()
-	etag := fmt.Sprintf(`W/"%x-%x"`, fi.Size(), fi.ModTime().UnixMilli())
+	etag := fmt.Sprintf(`W/"%x-%x"`, size, modTime.UnixMilli())
 	hd.Set("ETag", etag)
 	hd.Set("Cache-Control", "public, max-age=604800, immutable")
 	hd.Set("X-Content-Type-Options", "nosniff")
@@ -204,19 +225,19 @@ func (h *handlers) serveUploads(w http.ResponseWriter, r *http.Request) bool {
 		ct = v
 	}
 	hd.Set("Content-Type", ct)
-	switch rangeVerdict(r.Header.Get("Range"), fi.Size()) {
+	switch rangeVerdict(r.Header.Get("Range"), size) {
 	case rangeUnsatisfiable:
 		// send répond 416 ; l'erreur remonte au gestionnaire d'erreurs, qui répond 500.
 		for _, k := range []string{"ETag", "Cache-Control", "X-Content-Type-Options", "Access-Control-Allow-Origin", "Content-Disposition", "Content-Type"} {
 			hd.Del(k)
 		}
-		hd.Set("Content-Range", fmt.Sprintf("bytes */%d", fi.Size()))
+		hd.Set("Content-Range", fmt.Sprintf("bytes */%d", size))
 		platform.JSON(w, 500, platform.O("error", "Internal server error"))
 		return false
 	case rangeIgnore:
 		r.Header.Del("Range")
 	}
-	http.ServeContent(&keepLastModified{ResponseWriter: w, modTime: fi.ModTime()}, r, name, fi.ModTime(), f)
+	http.ServeContent(&keepLastModified{ResponseWriter: w, modTime: modTime}, r, name, modTime, content)
 	return false
 }
 

@@ -245,7 +245,7 @@ func ProcessImage(buf []byte, imgType, userID string) (*ProcessedImage, error) {
 	}
 
 	filename := userID + "-" + uuid.NewString() + ".webp"
-	if err := os.WriteFile(filepath.Join(uploadDir(), cfg.folder, filename), enc.Bytes(), 0o644); err != nil {
+	if err := saveImage(cfg.folder, filename, enc.Bytes()); err != nil {
 		return nil, err
 	}
 	id, loc := serviceIdentity()
@@ -323,6 +323,10 @@ func DeleteImage(imageURL string) {
 		}
 	}
 	if rel == "" {
+		return
+	}
+	if parts := strings.Split(rel, "/"); len(parts) == 2 && deleteStoredImage(parts[0], parts[1]) {
+		slog.Info("Image supprimée: " + imageURL)
 		return
 	}
 	dir := uploadDir()

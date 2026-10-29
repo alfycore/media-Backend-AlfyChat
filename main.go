@@ -6,6 +6,7 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"os"
@@ -45,12 +46,22 @@ func main() {
 	auth.Loose = true
 	auth.MissingMessage = "Token requis"
 
+	// Les images traitées vivent dans MySQL ; les documents restent sur disque.
+	db, err := platform.OpenDatabaseSized("alfychat", "alfychat", platform.EnvInt("DB_POOL_SIZE", 5))
+	if err != nil {
+		platform.Fatal("Erreur au démarrage", err)
+	}
+	if err := media.Migrate(context.Background(), db); err != nil {
+		platform.Fatal("Erreur au démarrage", err)
+	}
+	media.UseDatabase(db)
+
 	media.Register(srv, auth)
 
 	id := platform.Env("SERVICE_ID", "media-default")
 	loc := strings.ToUpper(platform.Env("SERVICE_LOCATION", "EU"))
 	port := platform.Env("PORT", "3007")
-	err := srv.Listen(port, func() {
+	err = srv.Listen(port, func() {
 		slog.Info("🖼️  Service Média démarré sur le port " + port)
 		slog.Info("   ID: " + id + " | Région: " + loc)
 		slog.Info("   Dossier uploads: " + root)
