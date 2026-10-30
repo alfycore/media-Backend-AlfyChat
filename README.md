@@ -2,8 +2,7 @@
 
 Microservice de gestion des fichiers et médias pour AlfyChat.
 
-![Node.js](https://img.shields.io/badge/Bun-1.2-black?logo=bun)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)
+![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)
 ![License](https://img.shields.io/badge/License-Source_Available-blue)
 
 ## Rôle
@@ -14,11 +13,10 @@ Ce service gère l'upload, le stockage et le traitement des fichiers multimédia
 
 | Catégorie | Technologies |
 |-----------|-------------|
-| Runtime | Bun |
-| Langage | TypeScript |
-| API | Express |
+| Langage | Go 1.26 |
+| API | net/http (stdlib) |
 | Upload | Multer |
-| Images | Sharp |
+| Images | Go (image, libwebp et libavif embarqués via WebAssembly, sans cgo) |
 | Auth | JWT |
 
 ## Architecture globale
@@ -38,7 +36,7 @@ Frontend (:4000)  →  Gateway (:3000)  →  Microservices
 
 ### Prérequis
 
-- [Bun](https://bun.sh/) ≥ 1.2
+- [Go](https://go.dev/) ≥ 1.26
 
 ### Variables d'environnement
 
@@ -50,23 +48,23 @@ UPLOAD_PATH=./uploads
 SERVICE_REGISTRY_URL=http://gateway:3000
 ```
 
-### Installation
-
-```bash
-bun install
-```
-
 ### Développement
 
 ```bash
-bun run dev
+go run .
 ```
 
 ### Build production
 
 ```bash
-bun run build
-bun run start
+go build -o bin/service .
+./bin/service
+```
+
+### Tests
+
+```bash
+go test ./...
 ```
 
 ### Docker
@@ -78,16 +76,10 @@ docker compose up media
 ## Structure du projet
 
 ```
-src/
-├── index.ts             # Point d'entrée
-├── routes/              # Routes Express (avatars, banners, icons, attachments)
-├── middleware/          # Auth JWT, validation MIME
-└── utils/               # Traitement d'images, nettoyage
-uploads/
-├── avatars/             # Avatars utilisateurs
-├── banners/             # Bannières profil / serveur
-├── icons/               # Icônes de serveur
-└── attachments/         # Pièces jointes messages
+main.go                  # Point d'entrée
+internal/
+├── media/               # Upload, traitement d'images (WebP), fichiers statiques
+└── platform/            # Socle commun aux services Go
 ```
 
 ## Contribution
